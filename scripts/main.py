@@ -13,7 +13,7 @@ tb_dir = "../tensorboard/"
 CHECK_INTERVAL  = 50 
 repeat = 10 
 
-datam = input_manager.InputManager("../data/tf_ships.pb2" , mb_size , repeat )
+datam = input_manager.InputManager("../data/tf_ships.pb2" , mb_size , repeat*mb_size )
 gan = model.GAN( 1 , 1 , 1 , 1)
 
 sess = tf.Session()
@@ -63,7 +63,11 @@ with tf.train.SingularMonitoredSession( hooks = hooks , checkpoint_dir = model_d
         #print(tt[0].shape)
         
         print("kiere luzhar")
-    gan.train(  10 , sess  )
+    try:
+        
+        gan.train(  10000 , sess  )
+    except tf.errors.OutOfRangeError:
+        print("Dataset agotado")
 
 
 print("good") 
