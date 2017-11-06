@@ -1,6 +1,6 @@
 import numpy as np 
 import tensorflow as tf 
-
+import pandas as pd 
 
 X_dim = 75*75
 z_dim = 100
@@ -23,7 +23,7 @@ class GAN():
         self.filters = filters 
         self.ks = ks 
         
-        self.init_vars()
+        #self.init_vars()
         
         
     def xavier_init( self , size):
@@ -87,8 +87,9 @@ class GAN():
         
         return th 
 
-    def build(self , X  ):
+    def build(self , X  , global_step ):
 
+        self.init_vars()
         var_list_G = self.varlist_G()
         var_list_D = self.varlist_D()
 
@@ -101,28 +102,77 @@ class GAN():
         self.G_loss = -tf.reduce_mean( D_fake )
 
         self.D_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4  ).minimize( -self.D_loss , var_list = var_list_D )
+            learning_rate = 1e-4  ).minimize( -self.D_loss , var_list = var_list_D  )
 
         self.G_solver = tf.train.RMSPropOptimizer(
             learning_rate = 1e-4
-        ).minimize( self.G_loss , var_list = var_list_G)
+        ).minimize( self.G_loss , var_list = var_list_G , global_step = global_step )
 
         
         self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_D]
 
+        tf.summary.scalar('G_loss' , self.G_loss)
+        tf.summary.scalar('D_loss' , self.D_loss ) 
         
-    def train(self , epochs , sess  ):
+        self.build_merge()
+        self.G_sample = G_sample
         
-        for it in range(epochs):
-            
+        print( self.merged_op ) 
+        
+    def train(self , start_step ,epochs , sess , tb_dir   ):
+        
+        self.build_writer( tb_dir , sess )
+        
+        for it in range( start_step , epochs):
+            D_loss_curr = None
             for _ in range(5):
 
                 _ , D_loss_curr , _ = sess.run( [ self.D_solver , self.D_loss , self.clip_D ] ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }   )
                 
             _ , G_loss_curr = sess.run( [self.G_solver , self.G_loss ]  , feed_dict = { self.z : self.sample_z(  mb_size , z_dim) } ) 
-            print("luzhaaaa")
+           
+            
+            if it % 100 == 0 :
+            
+                summary = sess.run( self.merged_op ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }  )
+                self.writer.add_summary( summary , it )
+                print("Step: {}".format(it) )
+                print("Generator Loss:{}".format( G_loss_curr ))
+                print("Discriminator Loss:{}".format( D_loss_curr ))
+                
         return
+
+
+    def generate(self, sess ):
+
+        
+        z = self.sample_z( mb_size*20 , z_dim )
+        samples  = sess.run( self.G_sample , feed_dict = {self.z : z })
+
+        sam_l = []
+        for i in range( samples.shape[0] ):
+
+            sam_l.append(  [ samples[i][:] ]  )
+
+
+        sam_l = np.array( sam_l )
+        #df = pd.DataFrame(   sam_l    )
+       
+        return samples
+        
         
     def sample_z(self , m, n):
 
         return np.random.uniform(-1., 1., size=[m, n])
+
+
+    def build_merge(self):
+
+        self.merged_op = tf.summary.merge_all()
+        
+        return 
+
+    def build_writer(self , tb_dir , sess ):
+
+        self.writer = tf.summary.FileWriter(tb_dir , sess.graph)
+        return 
