@@ -5,11 +5,11 @@ import model as model
 import input_manager
 
 z_dim = 100
-mb_size = 64 # batch_size
+mb_size = 32 # batch_size
 total_steps = 3500
 
-model_dir = "../model_output_ships_band2/"
-tb_dir = "../tensorboard_ships_band2/"
+model_dir = "../model_output_conv/ships"
+tb_dir = "../model_output_conv/ships/tensorboard"
 CHECK_INTERVAL  = 1000
 repeat = 1
 
@@ -35,7 +35,7 @@ global_step = tf.get_variable(
 )
 
 
-gan.build( input_test[1] , global_step  )
+gan.build( input_test , global_step  )
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth=True
@@ -69,8 +69,8 @@ with tf.train.SingularMonitoredSession( hooks = hooks , checkpoint_dir = model_d
     samples = gan.generate(  sess )
 
 
-    np.save( "new_ships_band2" , samples)
-    print(samples.shape)
+    #np.save( "new_ships_band2" , samples)
+    #print(samples.shape)
         
 
 print("Finished") 
