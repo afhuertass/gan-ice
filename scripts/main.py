@@ -63,7 +63,7 @@ with tf.train.SingularMonitoredSession( hooks = hooks , checkpoint_dir = model_d
     print(  "start step:{}".format( start_step ))
     try:    
         gan.train( start_step ,  total_steps , sess  , tb_dir    )
-    except tf.errors.OutOfRangeError:
+    except tf.error.OutOfRangeError:
         print("Dataset agotado")
 
     samples = gan.generate(  sess )

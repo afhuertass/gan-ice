@@ -208,7 +208,9 @@ class GAN():
                 
             _ , G_loss_curr = sess.run( [self.G_solver , self.G_loss ]  , feed_dict = { self.z : self.sample_z(  mb_size , z_dim) } ) 
            
-            
+            print("Step: {}".format(it) )
+            print("Generator Loss:{}".format( G_loss_curr ))
+            print("Discriminator Loss:{}".format( D_loss_curr ))
             if it % 100 == 0 :
             
                 summary = sess.run( self.merged_op ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }  )
