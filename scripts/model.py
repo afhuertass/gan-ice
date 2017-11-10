@@ -5,7 +5,7 @@ import pandas as pd
 X_dim = 75*75
 z_dim = 100
 h_dim = 128 
-mb_size = 32
+mb_size = 64
 def xavier_init(  size):
     in_dim = size[0]
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
@@ -22,7 +22,7 @@ class GAN():
         self.layers = layers 
         self.filters = filters 
         self.ks = ks 
-        self.dropout = 0.4
+        self.dropout = 0.33
         #self.init_vars()
         
         self.indxdi = 0
@@ -156,7 +156,7 @@ class GAN():
             out = tf.sigmoid(logits)
             print(out.shape)
             #return out , logits 
-            return out
+            return out , logits 
         
 
     def build_inputs_dis( self, band1 , band2 ):
@@ -177,14 +177,14 @@ class GAN():
         #var_list_D = self.varlist_D()
         
         G_sample = self.generator(self.z)
-        D_real = self.discriminator( inputs , "real_scope"  )
-        D_fake = self.discriminator( G_sample  , "fake_scope")
+        D_real ,D_logits = self.discriminator( inputs , "real_scope"  )
+        D_fake , D_logits_fake = self.discriminator( G_sample  , "fake_scope")
 
 
         # real images are (1) , fake ones are (0) 
-        D_loss_real = self.cross_entropy_loss( D_real , tf.ones_like(D_real) , name ="dloss1" )
+        D_loss_real = self.cross_entropy_loss( D_logits , tf.ones_like(D_real) , name ="dloss1" )
         #  fake ones are (0) 
-        D_loss_fake = self.cross_entropy_loss(D_fake , tf.zeros_like(D_fake) , name = "dloss2" )
+        D_loss_fake = self.cross_entropy_loss(D_logits_fake , tf.zeros_like(D_fake) , name = "dloss2" )
 
         self.D_loss = D_loss_real + D_loss_fake
         # the generator tries to produce outputs with label 1 
@@ -200,11 +200,11 @@ class GAN():
 
         var_list_gen = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
         
-        self.D_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4  ).minimize( self.D_loss , var_list = [var_list_dis_real , var_list_dis_fake  ]  )
+        self.D_solver = tf.train.AdamOptimizer(
+            learning_rate = 2e-4  ).minimize( self.D_loss , var_list = [var_list_dis_real , var_list_dis_fake  ]  )
 
-        self.G_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4
+        self.G_solver = tf.train.AdamOptimizer(
+            learning_rate = 2e-4
         ).minimize( self.G_loss , var_list = var_list_gen , global_step = global_step )
 
         
@@ -227,7 +227,7 @@ class GAN():
             D_loss_curr = None
             for _ in range(5):
 
-                _ , D_loss_curr  = sess.run( [ self.D_solver , self.D_loss , self.clip_D , self.clip_D2  ] ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }   )
+                _ , D_loss_curr  = sess.run( [ self.D_solver , self.D_loss   ] ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }   )
                 
             _ , G_loss_curr = sess.run( [self.G_solver , self.G_loss ]  , feed_dict = { self.z : self.sample_z(  mb_size , z_dim) } ) 
            

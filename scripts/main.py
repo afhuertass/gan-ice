@@ -5,8 +5,8 @@ import model as model
 import input_manager
 
 z_dim = 100
-mb_size = 32 # batch_size
-total_steps = 3500
+mb_size = 64 # batch_size
+total_steps = 500
 
 model_dir = "../model_output2/ships"
 tb_dir = "../model_output2/ships/tensorboard"
@@ -63,14 +63,14 @@ with tf.train.SingularMonitoredSession( hooks = hooks , checkpoint_dir = model_d
     print(  "start step:{}".format( start_step ))
     try:    
         gan.train( start_step ,  total_steps , sess  , tb_dir    )
-    except tf.error.OutOfRangeError:
+    except tf.errors.OutOfRangeError:
         print("Dataset agotado")
 
-    #samples = gan.generate(  sess )
+    samples = gan.generate(  sess )
 
 
-    #np.save( "new_ships_band2" , samples)
-    #print(samples.shape)
+    np.save( "new_ships_lawea" , samples)
+    print(samples.shape)
         
 
 print("Finished") 
