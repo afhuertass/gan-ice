@@ -6,10 +6,10 @@ import input_manager
 
 z_dim = 100
 mb_size = 64 # batch_size
-total_steps = 500
+total_steps = 10000
 
-model_dir = "../model_output2/ships"
-tb_dir = "../model_output2/ships/tensorboard"
+model_dir = "../model_output/ships"
+tb_dir = "../model_output/ships/tensorboard"
 CHECK_INTERVAL  = 1000
 repeat = 1
 

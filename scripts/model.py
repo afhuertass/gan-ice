@@ -64,11 +64,11 @@ class GAN():
             gen_fc = tf.layers.dense(
                 inputs = inputs ,
                 units = units ,
-                activation = tf.nn.relu , 
                 name = "kapa1"
             )
-            gen_fc = tf.layers.batch_normalization( gen_fc )
             
+            gen_fc = self.batchnormalize( gen_fc ) 
+            gen_fc = tf.nn.relu( gen_fc ) 
             gen_fc = tf.reshape( gen_fc , [-1 , 5 , 5 , 64  ])
             
             deconv1 = tf.layers.conv2d_transpose(
@@ -80,9 +80,11 @@ class GAN():
                 padding = 'same' , 
                 name = "kapa2"
             )
-            deconv1 = tf.layers.batch_normalization(deconv1)
+
+        
             deconv1 = tf.nn.relu( deconv1 ) 
             deconv1 = tf.layers.dropout(deconv1 , self.dropout )
+
             print("deconv shape ") # 15 , 15 , 32 
             print( deconv1.shape) 
 
@@ -95,16 +97,15 @@ class GAN():
 
                 name = "kapa3"
             )
-            deconv2 = tf.layers.batch_normalization( deconv2 )
+            deconv2 = self.batchnormalize( deconv2 )
             deconv2 = tf.nn.relu( deconv2 )
             
             deconv2 = tf.layers.dropout( deconv2 , self.dropout )
          
             gen_output = tf.tanh( deconv2 , 'gen_out' )
-
             print("shape output generator")
             print(gen_output.shape )
-            band1 = gen_output[:][:][:][0]
+            
             return gen_output
 
     
@@ -126,10 +127,10 @@ class GAN():
                 padding = 'same' ,
                 name = "capa1"
             )
-            
-            conv1 = tf.layers.batch_normalization(conv1 )
+           
+            conv1 = self.batchnormalize( conv1 )
             conv1 = tf.layers.dropout( conv1 , self.dropout)
-            
+            conv1 = self.lrelu( conv1 )
             print(conv1.shape)
             # conv2 [-1 , 5 , 5 , 32 ]
             conv2 = tf.layers.conv2d(
@@ -140,10 +141,12 @@ class GAN():
                 padding = 'same' ,
                 name = "capa2"
             )
-
-            conv2 = tf.layers.batch_normalization(conv2 )
-            conv2 = tf.layers.dropout( conv2 , self.dropout )
             
+            
+            conv2 = self.batchnormalize( conv2 )
+            conv2 = tf.layers.dropout( conv2 , self.dropout )
+            conv2 = self.lrelu( conv2 ) 
+
             print(conv2.shape)
             fc_input = tf.reshape( conv2  , (-1 , 5*5*32) )
             logits = tf.layers.dense(
@@ -153,7 +156,7 @@ class GAN():
                 name = "capa3"
             )
             print("shape output discriminator")
-            out = tf.sigmoid(logits)
+            out = self.lrelu(logits)
             print(out.shape)
             #return out , logits 
             return out , logits 
@@ -168,6 +171,15 @@ class GAN():
          inputs = tf.reshape( inputs , [-1 , 75,75 , 2  ])
 
          return inputs 
+
+    def lrelu(self ,  X , leak = 0.2 ):
+
+        f1 = 0.5*(1 + leak )
+        f2 = 0.5*(1-leak) 
+        return f1*X + f2*tf.abs(X)
+
+
+
     def build(self , X  , global_step ):
 
         self.init_vars()
@@ -231,9 +243,9 @@ class GAN():
                 
             _ , G_loss_curr = sess.run( [self.G_solver , self.G_loss ]  , feed_dict = { self.z : self.sample_z(  mb_size , z_dim) } ) 
            
-            print("Step: {}".format(it) )
-            print("Generator Loss:{}".format( G_loss_curr ))
-            print("Discriminator Loss:{}".format( D_loss_curr ))
+            #print("Step: {}".format(it) )
+            #print("Generator Loss:{}".format( G_loss_curr ))
+            #print("Discriminator Loss:{}".format( D_loss_curr ))
             if it % 100 == 0 :
             
                 summary = sess.run( self.merged_op ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }  )
@@ -286,4 +298,28 @@ class GAN():
 
         return xentropy
 
-    
+    def batchnormalize(self, X, eps=1e-8, g=None, b=None):
+        if X.get_shape().ndims == 4:
+            mean = tf.reduce_mean(X, [0,1,2])
+            std = tf.reduce_mean( tf.square(X-mean), [0,1,2] )
+            X = (X-mean) / tf.sqrt(std+eps)
+            
+            if g is not None and b is not None:
+                g = tf.reshape(g, [1,1,1,-1])
+                b = tf.reshape(b, [1,1,1,-1])
+                X = X*g + b
+
+        elif X.get_shape().ndims == 2:
+            mean = tf.reduce_mean(X, 0)
+            std = tf.reduce_mean(tf.square(X-mean), 0)
+            X = (X-mean) / tf.sqrt(std+eps)
+
+            if g is not None and b is not None:
+                g = tf.reshape(g, [1,-1])
+                b = tf.reshape(b, [1,-1])
+                X = X*g + b
+
+        else:
+            raise NotImplementedError
+            
+        return X
