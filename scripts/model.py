@@ -5,7 +5,7 @@ import pandas as pd
 X_dim = 75*75
 z_dim = 100
 h_dim = 128 
-mb_size = 132
+mb_size = 32
 def xavier_init(  size):
     in_dim = size[0]
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
@@ -143,6 +143,7 @@ class GAN():
 
             conv2 = tf.layers.batch_normalization(conv2 )
             conv2 = tf.layers.dropout( conv2 , self.dropout )
+            
             print(conv2.shape)
             fc_input = tf.reshape( conv2  , (-1 , 5*5*32) )
             logits = tf.layers.dense(
@@ -155,7 +156,7 @@ class GAN():
             out = tf.sigmoid(logits)
             print(out.shape)
             #return out , logits 
-            return out 
+            return out
         
 
     def build_inputs_dis( self, band1 , band2 ):
@@ -179,8 +180,18 @@ class GAN():
         D_real = self.discriminator( inputs , "real_scope"  )
         D_fake = self.discriminator( G_sample  , "fake_scope")
 
-        self.D_loss = tf.reduce_mean( D_real)- tf.reduce_mean(D_fake)
-        self.G_loss = -tf.reduce_mean( D_fake )
+
+        # real images are (1) , fake ones are (0) 
+        D_loss_real = self.cross_entropy_loss( D_real , tf.ones_like(D_real) , name ="dloss1" )
+        #  fake ones are (0) 
+        D_loss_fake = self.cross_entropy_loss(D_fake , tf.zeros_like(D_fake) , name = "dloss2" )
+
+        self.D_loss = D_loss_real + D_loss_fake
+        # the generator tries to produce outputs with label 1 
+        self.G_loss = self.cross_entropy_loss( D_fake , tf.ones_like(D_fake) , name = "gloss1" )
+        
+        #self.D_loss = tf.reduce_mean( D_real)- tf.reduce_mean(D_fake)
+        #self.G_loss = -tf.reduce_mean( D_fake )
 
 
         
@@ -190,7 +201,7 @@ class GAN():
         var_list_gen = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
         
         self.D_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4  ).minimize( -self.D_loss , var_list = [var_list_dis_real , var_list_dis_fake  ]  )
+            learning_rate = 1e-4  ).minimize( self.D_loss , var_list = [var_list_dis_real , var_list_dis_fake  ]  )
 
         self.G_solver = tf.train.RMSPropOptimizer(
             learning_rate = 1e-4
@@ -198,14 +209,15 @@ class GAN():
 
         
         #self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_D]
-
+        #self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_dis_real   ]
+        #self.clip_D2 = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_dis_fake   ]
+        
         tf.summary.scalar('G_loss' , self.G_loss)
         tf.summary.scalar('D_loss' , self.D_loss ) 
         
         self.build_merge()
         self.G_sample = G_sample
-        
-        print( self.merged_op ) 
+      
         
     def train(self , start_step ,epochs , sess , tb_dir   ):
         
@@ -215,7 +227,7 @@ class GAN():
             D_loss_curr = None
             for _ in range(5):
 
-                _ , D_loss_curr  = sess.run( [ self.D_solver , self.D_loss  ] ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }   )
+                _ , D_loss_curr  = sess.run( [ self.D_solver , self.D_loss , self.clip_D , self.clip_D2  ] ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }   )
                 
             _ , G_loss_curr = sess.run( [self.G_solver , self.G_loss ]  , feed_dict = { self.z : self.sample_z(  mb_size , z_dim) } ) 
            
@@ -266,3 +278,12 @@ class GAN():
 
         self.writer = tf.summary.FileWriter(tb_dir , sess.graph)
         return 
+
+
+    def cross_entropy_loss(self , logits , labels , name="xentropy" ):
+
+        xentropy = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = logits, labels = labels))
+
+        return xentropy
+
+    

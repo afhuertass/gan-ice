@@ -5,11 +5,11 @@ import model as model
 import input_manager
 
 z_dim = 100
-mb_size = 132 # batch_size
+mb_size = 32 # batch_size
 total_steps = 3500
 
-model_dir = "../model_output/ships"
-tb_dir = "../model_output/ships/tensorboard"
+model_dir = "../model_output2/ships"
+tb_dir = "../model_output2/ships/tensorboard"
 CHECK_INTERVAL  = 1000
 repeat = 1
 
