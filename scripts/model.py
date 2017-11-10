@@ -5,7 +5,7 @@ import pandas as pd
 X_dim = 75*75
 z_dim = 100
 h_dim = 128 
-mb_size = 32
+mb_size = 132
 def xavier_init(  size):
     in_dim = size[0]
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
@@ -25,7 +25,8 @@ class GAN():
         self.dropout = 0.4
         #self.init_vars()
         
-        
+        self.indxdi = 0
+        self.indxge = 0 
     def xavier_init( self , size):
         in_dim = size[0]
         xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
@@ -55,13 +56,16 @@ class GAN():
         # recive un vextor aleatorio y genera 
         # nuevo 
         # z  = [ batch_size , 100 ]
-        with tf.variable_scope('generator' , reuse = tf.AUTO_REUSE):
+        
+        with tf.variable_scope('generator'  ) as scope :
+            self.indxge = self.indxge + 1 
             inputs = tf.reshape( z , [-1, z_dim])
             units = 5*5*64
             gen_fc = tf.layers.dense(
                 inputs = inputs ,
                 units = units ,
-                activation = tf.nn.relu 
+                activation = tf.nn.relu , 
+                name = "kapa1"
             )
             gen_fc = tf.layers.batch_normalization( gen_fc )
             
@@ -73,7 +77,8 @@ class GAN():
                 kernel_size = [3,3] , 
                 strides = [ 3, 3] , 
                 activation = None ,
-                padding = 'same'
+                padding = 'same' , 
+                name = "kapa2"
             )
             deconv1 = tf.layers.batch_normalization(deconv1)
             deconv1 = tf.nn.relu( deconv1 ) 
@@ -87,7 +92,8 @@ class GAN():
                 filters = 2 ,
                 kernel_size = [5,5] , 
                 padding = 'same' ,
-                
+
+                name = "kapa3"
             )
             deconv2 = tf.layers.batch_normalization( deconv2 )
             deconv2 = tf.nn.relu( deconv2 )
@@ -103,21 +109,22 @@ class GAN():
 
     
 
-    def discriminator( self , inputs  ):
+    def discriminator( self , inputs , scope_name   ):
         
         # x [75*75]
-        with tf.variable_scope('discriminator' , reuse=tf.AUTO_REUSE ) :
-            inputs = tf.reshape( inputs , [-1 , 75,75 , 2 , 1 ])
+        inputs = tf.reshape( inputs , [-1 , 75,75 , 2  ])
+        with tf.variable_scope( scope_name ) as scope :
+        
 
             # inputs [-1 , 75 , 75 , 2 ]
             # conv1 [-1 , 15 , 15 , 8 ]
-            conv1 = tf.layers.conv3d(
+            conv1 = tf.layers.conv2d(
                 inputs = inputs ,
                 filters = 8 ,
-                kernel_size = [ 5 , 5 , 5  ],
-                strides = [ 5, 5 , 5 ],
+                kernel_size = [ 5 , 5 ],
+                strides = [ 5, 5] ,
                 padding = 'same' ,
-                activation = tf.nn.sigmoid
+                name = "capa1"
             )
             
             conv1 = tf.layers.batch_normalization(conv1 )
@@ -125,12 +132,13 @@ class GAN():
             
             print(conv1.shape)
             # conv2 [-1 , 5 , 5 , 32 ]
-            conv2 = tf.layers.conv3d(
+            conv2 = tf.layers.conv2d(
                 inputs = conv1 ,
                 filters = 32 ,
-                strides = [3,3, 3 ],
-                kernel_size = [3,3, 3 ] , 
+                strides = [3,3 ],
+                kernel_size = [3,3] , 
                 padding = 'same' ,
+                name = "capa2"
             )
 
             conv2 = tf.layers.batch_normalization(conv2 )
@@ -140,7 +148,8 @@ class GAN():
             logits = tf.layers.dense(
                 inputs = fc_input ,
                 units = 1 ,
-                activation = None
+                activation = None , 
+                name = "capa3"
             )
             print("shape output discriminator")
             out = tf.sigmoid(logits)
@@ -167,19 +176,21 @@ class GAN():
         #var_list_D = self.varlist_D()
         
         G_sample = self.generator(self.z)
-        D_real = self.discriminator( inputs  )
-        D_fake = self.discriminator( G_sample )
+        D_real = self.discriminator( inputs , "real_scope"  )
+        D_fake = self.discriminator( G_sample  , "fake_scope")
 
         self.D_loss = tf.reduce_mean( D_real)- tf.reduce_mean(D_fake)
         self.G_loss = -tf.reduce_mean( D_fake )
 
 
         
-        var_list_dis = tf.get_collection( tf.GraphKeys.GLOBAL_VARIABLES , scope = "discriminator" )
+        var_list_dis_real  = tf.get_collection( tf.GraphKeys.GLOBAL_VARIABLES , scope = "real_scope" )
+        var_list_dis_fake =  tf.get_collection( tf.GraphKeys.GLOBAL_VARIABLES , scope = "fake_scope" )
+
         var_list_gen = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
         
         self.D_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4  ).minimize( -self.D_loss , var_list = var_list_dis  )
+            learning_rate = 1e-4  ).minimize( -self.D_loss , var_list = [var_list_dis_real , var_list_dis_fake  ]  )
 
         self.G_solver = tf.train.RMSPropOptimizer(
             learning_rate = 1e-4

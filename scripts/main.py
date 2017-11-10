@@ -5,11 +5,11 @@ import model as model
 import input_manager
 
 z_dim = 100
-mb_size = 32 # batch_size
+mb_size = 132 # batch_size
 total_steps = 3500
 
-model_dir = "../model_output_conv/ships"
-tb_dir = "../model_output_conv/ships/tensorboard"
+model_dir = "../model_output/ships"
+tb_dir = "../model_output/ships/tensorboard"
 CHECK_INTERVAL  = 1000
 repeat = 1
 
@@ -66,7 +66,7 @@ with tf.train.SingularMonitoredSession( hooks = hooks , checkpoint_dir = model_d
     except tf.error.OutOfRangeError:
         print("Dataset agotado")
 
-    samples = gan.generate(  sess )
+    #samples = gan.generate(  sess )
 
 
     #np.save( "new_ships_band2" , samples)
