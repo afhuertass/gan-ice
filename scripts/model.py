@@ -58,65 +58,76 @@ class GAN():
         # z  = [ batch_size , 100 ]
         
         with tf.variable_scope('generator'  ) as scope :
-            self.indxge = self.indxge + 1 
-            inputs = tf.reshape( z , [-1, z_dim])
-            units = 5*5*64
-            gen_fc = tf.layers.dense(
-                inputs = inputs ,
-                units = units ,
-                name = "kapa1"
-            )
             
-            gen_fc = self.batchnormalize( gen_fc ) 
-            gen_fc = tf.nn.relu( gen_fc ) 
-            gen_fc = tf.reshape( gen_fc , [-1 , 5 , 5 , 64  ])
+            inputs = tf.reshape( z , [ mb_size, z_dim])
+            
+            units = 5*5*64
+            lin1 = self.linear( inputs , units , "g_lin1" )
+            lin1 = self.batch_norm2( lin1 , "g_normlin0" )
+            gen_fc = tf.nn.relu( lin1 , name = "g_relu1" )
+            
+            gen_fc = tf.reshape( gen_fc , [ mb_size , 5 , 5 , 64  ])
+            
             
             deconv1 = tf.layers.conv2d_transpose(
                 inputs = gen_fc ,
                 filters = 32 ,
                 kernel_size = [3,3] , 
                 strides = [ 3, 3] , 
-                activation = None ,
                 padding = 'same' , 
-                name = "kapa2"
+                name = "g_deconv1" ,
+               
             )
-
-        
+            
+            deconv1 = self.batch_norm2( deconv1 , "g_norm2" ) 
             deconv1 = tf.nn.relu( deconv1 ) 
-            deconv1 = tf.layers.dropout(deconv1 , self.dropout )
-
-            print("deconv shape ") # 15 , 15 , 32 
-            print( deconv1.shape) 
-
+            print("shape g_deconv1")
+            print( deconv1.shape)
+            
             deconv2 = tf.layers.conv2d_transpose(
                 inputs = deconv1 ,
                 strides = [ 5 , 5] ,
-                filters = 2 ,
+                filters = 32 ,
                 kernel_size = [5,5] , 
                 padding = 'same' ,
-
-                name = "kapa3"
+                
+                name = "g_deconv2" , 
             )
-            deconv2 = self.batchnormalize( deconv2 )
+            deconv2 = self.batch_norm2( deconv2 , "g_norm3" )
             deconv2 = tf.nn.relu( deconv2 )
             
-            deconv2 = tf.layers.dropout( deconv2 , self.dropout )
-         
-            gen_output = tf.tanh( deconv2 , 'gen_out' )
-            print("shape output generator")
-            print(gen_output.shape )
+            print("shape g_deconv2")
+            print( deconv2.shape)
             
-            return gen_output
+            deconv3 = tf.layers.conv2d_transpose(
+                inputs = deconv2 ,
+                filters = 2 ,
+                strides = [1,1] ,
+                kernel_size = [1,1] ,
+                name = "g_deconv3" ,
+                activation = tf.nn.tanh
+            )
+            # no wgan 
+            #gen_output = tf.tanh( deconv3 , name = 'g_tanh'  )
+            
+            print("shape output generator")
+            
+            print(deconv3.shape )
+            
+            return deconv3 
 
     
 
-    def discriminator( self , inputs , scope_name   ):
-        
-        # x [75*75]
-        inputs = tf.reshape( inputs , [-1 , 75,75 , 2  ])
-        with tf.variable_scope( scope_name ) as scope :
-        
+    def discriminator( self , inputs , reuse   ):
 
+        with tf.variable_scope("discriminator") as scope:
+
+            if reuse:
+                scope.reuse_variables() 
+        
+            # x [75*75]
+            stddev = 0.02
+            inputs = tf.reshape( inputs , [mb_size , 75,75 , 2  ])
             # inputs [-1 , 75 , 75 , 2 ]
             # conv1 [-1 , 15 , 15 , 8 ]
             conv1 = tf.layers.conv2d(
@@ -125,12 +136,15 @@ class GAN():
                 kernel_size = [ 5 , 5 ],
                 strides = [ 5, 5] ,
                 padding = 'same' ,
-                name = "capa1"
+                name = "d_conv1" ,
+                kernel_initializer =  tf.random_normal_initializer( stddev = stddev ) , 
+                bias_initializer =  tf.random_normal_initializer( stddev = stddev )
             )
            
-            conv1 = self.batchnormalize( conv1 )
-            conv1 = tf.layers.dropout( conv1 , self.dropout)
-            conv1 = self.lrelu( conv1 )
+            conv1 = self.batch_norm2( conv1 , "d_norm1" )
+            conv1 = self.lrelu( conv1 , name = "d_relu1")
+            
+            print("shape d_conv1 ")
             print(conv1.shape)
             # conv2 [-1 , 5 , 5 , 32 ]
             conv2 = tf.layers.conv2d(
@@ -139,27 +153,40 @@ class GAN():
                 strides = [3,3 ],
                 kernel_size = [3,3] , 
                 padding = 'same' ,
-                name = "capa2"
+                name = "d_conv2" ,
+                kernel_initializer =  tf.random_normal_initializer( stddev = stddev ) , 
+                bias_initializer =  tf.random_normal_initializer( stddev = stddev )
             )
             
+            conv2 = self.batch_norm2( conv2 , "d_norm2" )
+            conv2 = self.lrelu(conv2 , name="d_relu2")
             
-            conv2 = self.batchnormalize( conv2 )
-            conv2 = tf.layers.dropout( conv2 , self.dropout )
-            conv2 = self.lrelu( conv2 ) 
-
-            print(conv2.shape)
-            fc_input = tf.reshape( conv2  , (-1 , 5*5*32) )
-            logits = tf.layers.dense(
-                inputs = fc_input ,
-                units = 1 ,
-                activation = None , 
-                name = "capa3"
+            conv3 = tf.layers.conv2d(
+                inputs = conv2 ,
+                filters = 64 ,
+                strides = [5,5] ,
+                kernel_size = [5,5] ,
+                padding = "same" ,
+                name = "d_conv3" ,
+                kernel_initializer =  tf.random_normal_initializer( stddev = stddev ) , 
+                bias_initializer =  tf.random_normal_initializer( stddev = stddev )
             )
-            print("shape output discriminator")
-            out = self.lrelu(logits)
-            print(out.shape)
-            #return out , logits 
-            return out , logits 
+           
+            conv3 = self.batch_norm2( conv3 , "d_norm3" )
+            conv3 = self.lrelu(conv3, name = "d_relu23")
+            
+            print("shape d_conv2 ")
+            print(conv3.shape)
+            
+            conv3 = tf.reshape( conv3  , [mb_size , -1] )
+            output = self.linear( conv3 , 1 , "d_linear_out" )
+            
+           
+            print("shape output discriminator ")
+            print(output.shape)
+            # output [ logits , sigmoid ]
+            
+            return   output , tf.nn.sigmoid( output ) 
         
 
     def build_inputs_dis( self, band1 , band2 ):
@@ -167,18 +194,33 @@ class GAN():
          band1 = tf.reshape( band1  , [-1 ,  75 , 75 ] )
          band2 =  tf.reshape( band2  , [-1 ,  75 , 75 ] )
             
-         inputs = tf.stack( [band1 , band2] , axis = -1 )
-         inputs = tf.reshape( inputs , [-1 , 75,75 , 2  ])
+         inputs = tf.stack( [band1 , band2] , axis = 3 )
+         print("oie que rika sheip")
+         print( inputs.shape)
+         inputs = tf.reshape( inputs , [mb_size , 75,75 , 2  ])
 
          return inputs 
 
-    def lrelu(self ,  X , leak = 0.2 ):
+    def lrelu(self ,  X , leak = 0.2 , name = "lrelu"):
+        with tf.variable_scope(name):
+            f1 = 0.5*(1 + leak )
+            f2 = 0.5*(1-leak) 
+            return f1*X + f2*tf.abs(X)
 
-        f1 = 0.5*(1 + leak )
-        f2 = 0.5*(1-leak) 
-        return f1*X + f2*tf.abs(X)
+    
+    def linear( self , input_ , output_size , scope=None , stddev = 0.02, with_w = False):
+        #linear layer
+        shape = input_.get_shape().as_list()
 
+        with tf.variable_scope(scope or "Linear"):
+            m = tf.get_variable( "matrix" , [shape[1] , output_size] , tf.float32 , tf.random_normal_initializer( stddev = stddev ))
+            b = tf.get_variable("bias" , [output_size ])
+            if with_w:
 
+                return tf.matmul( input_, m ) + b , m , b
+            else :
+
+                return tf.matmul( input_ , m ) + b
 
     def build(self , X  , global_step ):
 
@@ -189,43 +231,46 @@ class GAN():
         #var_list_D = self.varlist_D()
         
         G_sample = self.generator(self.z)
-        D_real ,D_logits = self.discriminator( inputs , "real_scope"  )
-        D_fake , D_logits_fake = self.discriminator( G_sample  , "fake_scope")
+        
+        D_real , _  = self.discriminator( inputs , False )
+        
+        D_fake , _  = self.discriminator( G_sample  , True)
 
 
-        # real images are (1) , fake ones are (0) 
-        D_loss_real = self.cross_entropy_loss( D_logits , tf.ones_like(D_real) , name ="dloss1" )
+        # real images are (1) , fake ones are (0)
+        
+        D_loss_real = self.cross_entropy_loss( D_real , tf.ones_like(D_real)  )
         #  fake ones are (0) 
-        D_loss_fake = self.cross_entropy_loss(D_logits_fake , tf.zeros_like(D_fake) , name = "dloss2" )
+        D_loss_fake = self.cross_entropy_loss(D_fake , tf.zeros_like(D_fake) )
 
-        self.D_loss = D_loss_real + D_loss_fake
-        # the generator tries to produce outputs with label 1 
-        self.G_loss = self.cross_entropy_loss( D_fake , tf.ones_like(D_fake) , name = "gloss1" )
+        self.D_loss = -tf.reduce_mean( D_real ) + tf.reduce_mean(D_fake)
+        self.G_loss = -tf.reduce_mean( D_fake )
         
-        #self.D_loss = tf.reduce_mean( D_real)- tf.reduce_mean(D_fake)
-        #self.G_loss = -tf.reduce_mean( D_fake )
-
-
+        GAN_loss = tf.reduce_mean( self.G_loss + self.D_loss )
         
-        var_list_dis_real  = tf.get_collection( tf.GraphKeys.GLOBAL_VARIABLES , scope = "real_scope" )
-        var_list_dis_fake =  tf.get_collection( tf.GraphKeys.GLOBAL_VARIABLES , scope = "fake_scope" )
+   
+        t_vars = tf.trainable_variables()
 
-        var_list_gen = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='generator')
+        #var_list_d = [ var for var in t_vars if 'd_' is in var.name ]
+        var_list_d = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="discriminator" )
+        var_list_g = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope="generator" )
         
-        self.D_solver = tf.train.AdamOptimizer(
-            learning_rate = 2e-4  ).minimize( self.D_loss , var_list = [var_list_dis_real , var_list_dis_fake  ]  )
+        var_list_d = [ var for var in t_vars if 'd_'  in var.name ]
+        var_list_g = [ var for var in t_vars if 'g_'  in var.name ]
 
-        self.G_solver = tf.train.AdamOptimizer(
-            learning_rate = 2e-4
-        ).minimize( self.G_loss , var_list = var_list_gen , global_step = global_step )
+        print(var_list_g ) 
+        self.D_solver = tf.train.RMSPropOptimizer(
+            learning_rate = 1e-4  ).minimize( self.D_loss , var_list = var_list_d  )
 
-        
-        #self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_D]
-        #self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_dis_real   ]
-        #self.clip_D2 = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_dis_fake   ]
-        
-        tf.summary.scalar('G_loss' , self.G_loss)
-        tf.summary.scalar('D_loss' , self.D_loss ) 
+        self.G_solver = tf.train.RMSPropOptimizer(
+            learning_rate = 1e-4
+        ).minimize( self.G_loss , var_list = var_list_g , global_step = global_step )
+
+        self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_d]
+
+        tf.summary.scalar('G_loss' , self.G_loss )
+        tf.summary.scalar('D_loss' , self.D_loss )
+        tf.summary.scalar('GAN_loss',  GAN_loss )
         
         self.build_merge()
         self.G_sample = G_sample
@@ -237,17 +282,22 @@ class GAN():
         
         for it in range( start_step , epochs):
             D_loss_curr = None
-            for _ in range(5):
+            n_d = 10 if it < 25 or (it+1) % 500 == 0 else 5
+            print("training discriminator {} before generator".format(n_d))
+            for _ in range(n_d):
 
-                _ , D_loss_curr  = sess.run( [ self.D_solver , self.D_loss   ] ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }   )
-                
-            _ , G_loss_curr = sess.run( [self.G_solver , self.G_loss ]  , feed_dict = { self.z : self.sample_z(  mb_size , z_dim) } ) 
            
-            #print("Step: {}".format(it) )
-            #print("Generator Loss:{}".format( G_loss_curr ))
-            #print("Discriminator Loss:{}".format( D_loss_curr ))
-            if it % 100 == 0 :
+                
+                ## updating D network 
+                _ , D_loss_curr, _   = sess.run( [ self.D_solver , self.D_loss , self.clip_D  ] ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }   )
+
+                
+            # updating G network - two times 
+            _ , G_loss_curr = sess.run( [self.G_solver , self.G_loss ]  , feed_dict = { self.z : self.sample_z(  mb_size , z_dim) } ) 
             
+            print("Step: {}".format(it) )
+            if it % 10 == 0 :
+                
                 summary = sess.run( self.merged_op ,feed_dict = { self.z : self.sample_z(  mb_size , z_dim) }  )
                 self.writer.add_summary( summary , it )
                 print("Step: {}".format(it) )
@@ -260,24 +310,18 @@ class GAN():
     def generate(self, sess ):
 
         
-        z = self.sample_z( mb_size*20 , z_dim )
+        z = self.sample_z( mb_size , z_dim )
         samples  = sess.run( self.G_sample , feed_dict = {self.z : z })
 
-        sam_l = []
-        for i in range( samples.shape[0] ):
-
-            sam_l.append(  [ samples[i][:] ]  )
-
-
-        sam_l = np.array( sam_l )
-        #df = pd.DataFrame(   sam_l    )
-       
         return samples
         
         
     def sample_z(self , m, n):
+        
+        return np.random.normal( 0 , 0.1 , size=[m, n])
 
-        return np.random.uniform(-1., 1., size=[m, n])
+        #return np.random.uniform(-1., 1., size=[m, n])
+
 
 
     def build_merge(self):
@@ -293,11 +337,25 @@ class GAN():
 
 
     def cross_entropy_loss(self , logits , labels , name="xentropy" ):
-
-        xentropy = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = logits, labels = labels))
+        o = tf.clip_by_value( logits , 1e-7, 1. - 1e-7)
+        xentropy = tf.reduce_mean( tf.nn.sigmoid_cross_entropy_with_logits(logits = o, labels = labels))
 
         return xentropy
 
+
+    def batch_norm2( self , x , name ,  train = True):
+        momentum = 0.5
+        epsilon = 1e-5
+        return tf.layers.batch_normalization(
+            x ,
+            momentum = momentum ,
+            epsilon = epsilon ,
+            scale = True ,
+            training = train ,
+            name = name
+        )
+    
+        
     def batchnormalize(self, X, eps=1e-8, g=None, b=None):
         if X.get_shape().ndims == 4:
             mean = tf.reduce_mean(X, [0,1,2])
