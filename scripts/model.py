@@ -243,9 +243,8 @@ class GAN():
         #  fake ones are (0) 
         D_loss_fake = self.cross_entropy_loss(D_fake , tf.zeros_like(D_fake) )
 
-        self.D_loss = -tf.reduce_mean( D_real ) + tf.reduce_mean(D_fake)
-        self.G_loss = -tf.reduce_mean( D_fake )
-        
+        self.D_loss = tf.reduce_mean( D_fake  - D_real )
+        self.G_loss = tf.reduce_mean(-D_fake )       
         GAN_loss = tf.reduce_mean( self.G_loss + self.D_loss )
         
    
