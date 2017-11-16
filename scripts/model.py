@@ -105,10 +105,10 @@ class GAN():
                 strides = [1,1] ,
                 kernel_size = [1,1] ,
                 name = "g_deconv3" ,
-                activation = tf.nn.tanh
+                
             )
             # no wgan 
-            #gen_output = tf.tanh( deconv3 , name = 'g_tanh'  )
+            gen_output = tf.tanh( deconv3 , name = 'g_tanh'  )
             
             print("shape output generator")
             
@@ -126,7 +126,7 @@ class GAN():
                 scope.reuse_variables() 
         
             # x [75*75]
-            stddev = 0.02
+            stddev = 0.05
             inputs = tf.reshape( inputs , [mb_size , 75,75 , 2  ])
             # inputs [-1 , 75 , 75 , 2 ]
             # conv1 [-1 , 15 , 15 , 8 ]
@@ -186,7 +186,7 @@ class GAN():
             print(output.shape)
             # output [ logits , sigmoid ]
             
-            return   output , tf.nn.sigmoid( output ) 
+            return   conv3 , tf.nn.sigmoid( output ) 
         
 
     def build_inputs_dis( self, band1 , band2 ):
@@ -198,7 +198,7 @@ class GAN():
          print("oie que rika sheip")
          print( inputs.shape)
          inputs = tf.reshape( inputs , [mb_size , 75,75 , 2  ])
-
+         #inputs = tf.nn.tanh( inputs ) 
          return inputs 
 
     def lrelu(self ,  X , leak = 0.2 , name = "lrelu"):
@@ -243,8 +243,8 @@ class GAN():
         #  fake ones are (0) 
         D_loss_fake = self.cross_entropy_loss(D_fake , tf.zeros_like(D_fake) )
 
-        self.D_loss = tf.reduce_mean( D_fake  - D_real )
-        self.G_loss = tf.reduce_mean(-D_fake )       
+        self.D_loss = tf.reduce_mean( D_real )  - tf.reduce_mean( D_fake ) 
+        self.G_loss = -tf.reduce_mean(D_fake )       
         GAN_loss = tf.reduce_mean( self.G_loss + self.D_loss )
         
    
@@ -259,10 +259,10 @@ class GAN():
 
         print(var_list_g ) 
         self.D_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4  ).minimize( self.D_loss , var_list = var_list_d  )
+            learning_rate = 5e-5  ).minimize( -self.D_loss , var_list = var_list_d  )
 
         self.G_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4
+            learning_rate = 5e-5
         ).minimize( self.G_loss , var_list = var_list_g , global_step = global_step )
 
         self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_d]
@@ -281,7 +281,7 @@ class GAN():
         
         for it in range( start_step , epochs):
             D_loss_curr = None
-            n_d = 10 if it < 25 or (it+1) % 500 == 0 else 5
+            n_d = 100 if it < 25 or (it+1) % 500 == 0 else 5
             print("training discriminator {} before generator".format(n_d))
             for _ in range(n_d):
 

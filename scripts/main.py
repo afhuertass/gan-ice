@@ -6,7 +6,7 @@ import input_manager
 
 z_dim = 100
 mb_size = 64 # batch_size
-total_steps = 4000
+total_steps = 24000
 
 model_dir = "../model_output/ships"
 tb_dir = "../model_output/ships/tensorboard"
