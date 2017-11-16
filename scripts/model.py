@@ -51,6 +51,57 @@ class GAN():
         # placeholder 
         self.z = tf.placeholder(tf.float32, shape=[None, z_dim])
 
+    def generator_mlp(self ,z ):
+
+        with tf.variable_scope("generator") as scope:
+            # inputs [batch , 100 ]
+            inputs = tf.reshape(z ,  [mb_size , z_dim ])
+            units =  75*75 
+            lin1 = self.linear( inputs , units , "g_lin1" )
+            lin1 = tf.nn.relu(lin1)
+            print(lin1.shape)
+            #lin1 [b , 75*75 ]
+            units2 = 75*75*2
+            
+            lin2 = self.linear(lin1 , units2 , "g_lin2" )
+            lin2 = tf.nn.relu( lin2)
+            print(lin2.shape)
+            
+            units3 = 75*75*2
+
+            lin3 = self.linear( lin2 , units3 , "g_lin3")
+            lin3 = tf.nn.tanh( lin2 )
+            print(lin3.shape)
+            lin3 = tf.reshape( lin3 , [mb_size , 75,75,2] )
+            return tf.nn.tanh( lin3 ) 
+            
+        
+    def discriminator_mlp(self , x , reuse ) :
+
+        with tf.variable_scope("discriminator") as scope:
+            
+            if reuse:
+                scope.reuse_variables() 
+
+            # x [mb , 75, 75 *2 ]
+            inputs = tf.reshape(x ,[mb_size , 75*75*2 ] )
+            units1 = 75*75 
+            lin1 = self.linear( inputs , units1 , "d_lin1")
+            lin1 = self.lrelu( lin1)
+
+            units2 = 15*15 
+            lin2 = self.linear( lin1,  units2 , "d_lin2")
+            lin2 = self.lrelu( lin2)
+
+            units3 = 5*5
+            lin3 = self.linear( lin2 , units3 , "d_lin3")
+            lin3 = self.lrelu( lin3)
+
+            lin4 = self.linear( lin3 , 1 , "d_lin4")
+
+            return lin4 , tf.nn.sigmoid( lin4 ) 
+
+        
     def generator(self , z):
         
         # recive un vextor aleatorio y genera 
@@ -213,8 +264,8 @@ class GAN():
         shape = input_.get_shape().as_list()
 
         with tf.variable_scope(scope or "Linear"):
-            m = tf.get_variable( "matrix" , [shape[1] , output_size] , tf.float32 , tf.random_normal_initializer( stddev = stddev ))
-            b = tf.get_variable("bias" , [output_size ])
+            m = tf.get_variable( "{}_matrix".format(scope) , [shape[1] , output_size] , tf.float32 , tf.random_normal_initializer( stddev = stddev ))
+            b = tf.get_variable("{}_bias".format(scope) , [output_size ])
             if with_w:
 
                 return tf.matmul( input_, m ) + b , m , b
@@ -230,11 +281,11 @@ class GAN():
         #var_list_G = self.varlist_G()
         #var_list_D = self.varlist_D()
         
-        G_sample = self.generator(self.z)
+        G_sample = self.generator_mlp(self.z)
         
-        D_real , _  = self.discriminator( inputs , False )
+        D_real , _  = self.discriminator_mlp( inputs , False )
         
-        D_fake , _  = self.discriminator( G_sample  , True)
+        D_fake , _  = self.discriminator_mlp( G_sample  , True)
 
 
         # real images are (1) , fake ones are (0)
@@ -243,8 +294,8 @@ class GAN():
         #  fake ones are (0) 
         D_loss_fake = self.cross_entropy_loss(D_fake , tf.zeros_like(D_fake) )
 
-        self.D_loss = tf.reduce_mean( D_fake  - D_real )
-        self.G_loss = tf.reduce_mean(-D_fake )       
+        self.D_loss = tf.reduce_mean( D_fake)  - tf.reduce_mean(D_real )
+        self.G_loss = -tf.reduce_mean(D_fake )       
         GAN_loss = tf.reduce_mean( self.G_loss + self.D_loss )
         
    
@@ -259,10 +310,10 @@ class GAN():
 
         print(var_list_g ) 
         self.D_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4  ).minimize( self.D_loss , var_list = var_list_d  )
+            learning_rate = 1e-5  ).minimize( self.D_loss , var_list = var_list_d  )
 
         self.G_solver = tf.train.RMSPropOptimizer(
-            learning_rate = 1e-4
+            learning_rate = 1e-5
         ).minimize( self.G_loss , var_list = var_list_g , global_step = global_step )
 
         self.clip_D = [p.assign(tf.clip_by_value(p, -0.01, 0.01)) for p in var_list_d]
