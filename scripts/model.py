@@ -54,11 +54,22 @@ class GAN():
         
         # recive un vextor aleatorio y genera 
         # nuevo 
-        # z  = [ batch_size , 75 , 75 ]
-       
-        g_h1 = tf.nn.relu(  tf.matmul( z , self.G_w1 ) + self.G_b1 )
-        g_log_prob = tf.matmul( g_h1 , self.G_w2 ) + self.G_b2
+        # z  = [ batch_size , 100 ]
+        with tf.variable_scope("generator") as scope:
+            
 
+            
+
+            g_h1 = tf.nn.relu(  tf.matmul( z , self.G_w1 ) + self.G_b1 )
+            g_log_prob = tf.matmul( g_h1 , self.G_w2 ) + self.G_b2
+
+            g_h1 = tf.nn.relu( g_log_prob)
+            
+            # g_log_prob [ mb_size ,75*75]
+
+            
+
+            
         g_prob = tf.nn.sigmoid( g_log_prob )
         return g_prob
 
