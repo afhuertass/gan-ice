@@ -67,7 +67,7 @@ class GAN():
 
     def discriminator( self , x ):
         
-        # x [75*75] 
+        # x [mb_size,75*75] 
         D_h1 = tf.nn.relu( tf.matmul( x , self.D_w1 ) + self.D_b1  )
         # shape [ h_dim]
         out = tf.matmul( D_h1 , self.D_w2 ) + self.D_b2
