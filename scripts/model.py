@@ -146,7 +146,7 @@ class GAN():
     def generate(self, sess ):
 
         
-        z = self.sample_z( mb_size*20 , z_dim )
+        z = self.sample_z( mb_size*100 , z_dim )
         samples  = sess.run( self.G_sample , feed_dict = {self.z : z })
 
         sam_l = []
