@@ -1,3 +1,5 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"]="-1"    
 import tensorflow as tf
 import numpy as np
 import model as model
@@ -5,8 +7,8 @@ import model as model
 import input_manager
 
 z_dim = 100
-mb_size = 64 # batch_size
-total_steps = 24000
+mb_size = 32 # batch_size
+total_steps = 10000
 
 model_dir = "../model_output/ships"
 tb_dir = "../model_output/ships/tensorboard"
@@ -37,8 +39,8 @@ global_step = tf.get_variable(
 
 gan.build( input_test , global_step  )
 
-config = tf.ConfigProto()
-config.gpu_options.allow_growth=True
+#config = tf.ConfigProto()
+#config.gpu_options.allow_growth=True
 
 saver = tf.train.Saver( )
 hooks = [
@@ -54,7 +56,7 @@ hooks = [
 
 
 
-with tf.train.SingularMonitoredSession( hooks = hooks , checkpoint_dir = model_dir , config = config ) as sess:
+with tf.train.SingularMonitoredSession( hooks = hooks , checkpoint_dir = model_dir  ) as sess:
     
     # kiere luzhar 
     sess.run( iterator.initializer )
